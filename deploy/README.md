@@ -49,7 +49,7 @@ The fork tracks `nousresearch/hermes-agent` via the `upstream` remote. To pull
 new changes from Nous and keep our `deploy/` on top:
 
 ```bash
-cd ~/projects/hermes-agent
+cd ~/projects/roxabi-hermes
 git fetch upstream
 git rebase upstream/main          # replay our deploy/ commits on top of upstream
 git push --force-with-lease origin main
