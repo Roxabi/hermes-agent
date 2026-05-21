@@ -26,9 +26,11 @@ subdir). See `hermes-personal.container` inline comments for the wiring.
 
 ## Install (on M₁, the only host currently running Hermes)
 
+First-time setup — clone the fork on M₁ and run the Makefile target:
+
 ```bash
-scp deploy/quadlet/hermes-*.{container,volume} roxabituwer:~/.config/containers/systemd/
-ssh roxabituwer 'systemctl --user daemon-reload'
+ssh roxabituwer 'git clone git@github.com:Roxabi/hermes-agent.git ~/projects/roxabi-hermes'
+ssh roxabituwer 'cd ~/projects/roxabi-hermes && make install-quadlet'
 
 # Per bot, fill ~/.hermes/bots/<name>/.env (chmod 600) before first start:
 #   CUSTOM_BASE_URL=http://192.168.1.16:18091/v1
@@ -36,12 +38,21 @@ ssh roxabituwer 'systemctl --user daemon-reload'
 #   TELEGRAM_BOT_TOKEN=<real token>
 #   TELEGRAM_ALLOWED_USERS=<user id>
 
-ssh roxabituwer 'systemctl --user start hermes-default.service hermes-personal.service'
+ssh roxabituwer 'cd ~/projects/roxabi-hermes && make start'
+```
+
+Subsequent updates (after pushing changes to `origin/main`):
+
+```bash
+ssh roxabituwer 'cd ~/projects/roxabi-hermes && make sync'   # git pull + install-quadlet + restart
 ```
 
 `enable` is a no-op for Quadlet-generated units — persistence is wired by the
 Quadlet generator from the `[Install]` block. `linger` on the user manager
 handles boot-time autostart.
+
+Makefile targets: `install-quadlet`, `uninstall-quadlet`, `start`, `stop`,
+`restart`, `status`, `logs`, `sync`. Run `make help` for the list.
 
 ## Upstream sync
 

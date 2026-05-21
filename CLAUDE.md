@@ -117,15 +117,20 @@ model:
 
 ## Install (M₁)
 
+M₁ clones the fork and runs the Makefile — same pattern as lyra and llmCLI:
+
 ```bash
-# 1. Sync Quadlets to M₁'s user-manager
-scp deploy/quadlet/hermes-*.{container,volume} roxabituwer:~/.config/containers/systemd/
-ssh roxabituwer 'systemctl --user daemon-reload'
+# 1. First-time setup (clone + install Quadlets + create bot dirs)
+ssh roxabituwer 'git clone git@github.com:Roxabi/hermes-agent.git ~/projects/roxabi-hermes'
+ssh roxabituwer 'cd ~/projects/roxabi-hermes && make install-quadlet'
 
 # 2. Fill ~/.hermes/bots/{default,personal}/.env with real tokens (one-off)
 
-# 3. Start — `enable` is a no-op for Quadlets (handled by [Install] block)
-ssh roxabituwer 'systemctl --user start hermes-default.service hermes-personal.service'
+# 3. Start
+ssh roxabituwer 'cd ~/projects/roxabi-hermes && make start'
+
+# Subsequent updates (after pushing changes from devbox to origin/main):
+ssh roxabituwer 'cd ~/projects/roxabi-hermes && make sync'   # pull + install + restart
 ```
 
 `linger` is already set on the user-manager on M₁ → autostart at boot via the
@@ -133,14 +138,17 @@ ssh roxabituwer 'systemctl --user start hermes-default.service hermes-personal.s
 
 ## Operational quick-ref
 
+All commands assume `~/projects/roxabi-hermes` is cloned on M₁.
+
 | Goal | Command |
 |---|---|
-| Status of both bots | `ssh roxabituwer 'systemctl --user status hermes-default.service hermes-personal.service'` |
-| Live logs (default) | `ssh roxabituwer 'journalctl --user -u hermes-default.service -f'` |
+| Status of both bots | `ssh roxabituwer 'cd ~/projects/roxabi-hermes && make status'` |
+| Live logs (both bots) | `ssh roxabituwer 'cd ~/projects/roxabi-hermes && make logs'` |
+| Stop both | `ssh roxabituwer 'cd ~/projects/roxabi-hermes && make stop'` |
+| Restart both | `ssh roxabituwer 'cd ~/projects/roxabi-hermes && make restart'` |
+| Pull + reinstall + restart | `ssh roxabituwer 'cd ~/projects/roxabi-hermes && make sync'` |
 | One-off chat (no Telegram, no running container) | `ssh roxabituwer 'podman run --rm -it --network systemd-roxabi --userns=keep-id:uid=10000,gid=10000 -v ~/.hermes/bots/default:/opt/data:z -e CUSTOM_BASE_URL=http://192.168.1.16:18091/v1 -e OPENAI_API_KEY=<your-llmcli-master-key> docker.io/nousresearch/hermes-agent:latest chat'` |
 | Attach to running container (Telegram up) | `ssh roxabituwer 'podman exec -it hermes-default hermes chat'` |
-| Stop both | `ssh roxabituwer 'systemctl --user stop hermes-default.service hermes-personal.service'` |
-| Restart after Quadlet edit | `scp` new file → `daemon-reload` → `systemctl --user restart <svc>` |
 
 One-off and exec sessions share `~/.hermes/bots/default/` state → memories /
 sessions persist across both.
