@@ -1,0 +1,16 @@
+[Unit]
+Description=Hermes Agent — personal bot data bind-mount (~/.hermes/bots/personal)
+# One .volume per bot — pattern: ~/.hermes/bots/<name>/ on host ↔ /opt/data in
+# container. The container thinks it's a single-instance hermes (no `-p` flag,
+# no `profiles/` subdir inside its HERMES_HOME); isolation comes from the
+# distinct host bind path. See hermes-personal.container for the data layout.
+#
+# Quadlet .volume wrapper (Type=none + Options=bind) keeps host files
+# operator-editable; named volume approach (ADR-053 in lyra) made host files
+# inaccessible, breaking credential lookup.
+
+[Volume]
+Type=none
+Device=%h/.hermes/bots/personal
+Options=bind
+Label=app=roxabi

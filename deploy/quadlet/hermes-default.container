@@ -1,0 +1,73 @@
+[Unit]
+Description=Hermes Agent — default bot (sandbox / scratch)
+# Pattern: one container per bot (Telegram persona). N bots = N Quadlets sharing
+# the same image, each with its own ~/.hermes/bots/<name>/ data dir. Container-level
+# isolation replaces hermes' built-in `profiles` system — simpler, granular restart,
+# isolated logs, OOM blast-radius capped per bot.
+# Outbound-only (LLM API + chat platform webhooks/polling); network-online.target
+# is enough. No dependency on other hermes-* services.
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Container]
+# Official upstream image on Docker Hub. AutoUpdate=registry → podman-auto-update.timer
+# checks the digest every 5 min and restarts on change (see lyra
+# docs/ops/container-publishing.md § Auto-Update Flow).
+# To pin a known-good version, replace `:latest` with `:vX.Y.Z` and remove the Label.
+Image=docker.io/nousresearch/hermes-agent:latest
+Label=io.containers.autoupdate=registry
+ContainerName=hermes-default
+Network=roxabi.network
+
+# Hardening — defense in depth (matches lyra invariants where compatible).
+NoNewPrivileges=true
+DropCapability=all
+# DEVIATION from lyra `ReadOnly=true`: hermes ships a writable /opt/hermes/.venv
+# by design — `tools/lazy_deps.py` installs platform-specific adapter packages
+# (discord.py, etc.) at first use, and the Dockerfile explicitly chowns .venv to
+# the hermes user with this contract documented. Read-only root FS breaks runtime
+# `uv pip install`. The `--extra all` build covers most paths; if you confirm
+# none of your adapters trigger lazy_deps in your config, you can enable
+# ReadOnly=true and accept the residual failure mode.
+# ReadOnly=true
+
+# UserNS=keep-id maps container UID 10000 (the baked-in `hermes` user) to host
+# UID 1000 (mickael), which owns the bot data dir. The container starts directly
+# as `hermes`, so the entrypoint's `if [ "$(id -u)" = "0" ]` root-only block (chown
+# + gosu drop) is skipped cleanly — no usermod/groupmod needed. HERMES_UID/GID
+# env vars from the upstream docker-compose are intentionally NOT set here:
+# they only apply to the root-bootstrap path.
+UserNS=keep-id:uid=10000,gid=10000
+
+# Bind mount: ~/.hermes/bots/default ↔ /opt/data. Holds this bot's config.yaml,
+# .env (Telegram token + LLM keys), sessions/, skills/, memories/, plans/, cron/,
+# logs/, hooks/, home/, workspace/. Fully isolated from other hermes-* bots.
+# Image is stateless — upgrade by `podman pull` (or auto-update); state survives.
+Volume=hermes-default.volume:/opt/data:z
+
+# No PublishPort in pure gateway mode — Telegram polling, Discord WS, Slack
+# webhooks, LLM API calls are all outbound. Uncomment ONE of the blocks below
+# only if you need host access; see security notes in docker-compose.yml.
+#
+# OpenAI-compat API server (requires API_SERVER_KEY ≥ 8 chars):
+# Environment=API_SERVER_ENABLED=true
+# Environment=API_SERVER_HOST=0.0.0.0
+# Environment=API_SERVER_KEY=
+# PublishPort=127.0.0.1:8642:8642
+#
+# Web dashboard (in-container side-process, not auto-restarted if it crashes):
+# Environment=HERMES_DASHBOARD=1
+# PublishPort=127.0.0.1:9119:9119
+
+Exec=gateway run
+
+[Service]
+Restart=on-failure
+RestartSec=5
+# Cap at 2 cores — voice transcription + LLM streaming can spin up workers.
+CPUQuota=200%
+
+[Install]
+WantedBy=default.target
