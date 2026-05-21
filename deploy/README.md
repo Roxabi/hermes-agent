@@ -33,7 +33,7 @@ ssh roxabituwer 'git clone git@github.com:Roxabi/hermes-agent.git ~/projects/rox
 ssh roxabituwer 'cd ~/projects/roxabi-hermes && make install-quadlet'
 
 # Per bot, fill ~/.hermes/bots/<name>/.env (chmod 600) before first start:
-#   CUSTOM_BASE_URL=http://192.168.1.16:18091/v1
+#   CUSTOM_BASE_URL=http://host.containers.internal:18091/v1
 #   OPENAI_API_KEY=<your-llmcli-master-key>
 #   TELEGRAM_BOT_TOKEN=<real token>
 #   TELEGRAM_ALLOWED_USERS=<user id>
