@@ -34,12 +34,16 @@ DropCapability=all
 # ReadOnly=true
 
 # UserNS=keep-id maps container UID 10000 (the baked-in `hermes` user) to host
-# UID 1000 (mickael), which owns the bot data dir. The container starts directly
-# as `hermes`, so the entrypoint's `if [ "$(id -u)" = "0" ]` root-only block (chown
-# + gosu drop) is skipped cleanly — no usermod/groupmod needed. HERMES_UID/GID
-# env vars from the upstream docker-compose are intentionally NOT set here:
-# they only apply to the root-bootstrap path.
+# UID 1000 (mickael), which owns the bot data dir. We ALSO force User=10000:10000
+# so podman starts the container directly as uid 10000 — without it, the upstream
+# entrypoint runs as root and tries to `su hermes`, which fails under our
+# DropCapability=all (no CAP_SETUID). Verified 2026-05-22 on
+# nousresearch/hermes-agent:latest digest 9d0a12c0…: removing `User=` produces
+# `error: failed switching to 'hermes': operation not permitted` and a
+# crashloop. HERMES_UID/GID env vars from the upstream docker-compose are
+# intentionally NOT set here: they only apply to the root-bootstrap path.
 UserNS=keep-id:uid=10000,gid=10000
+User=10000:10000
 
 # Bind mount: ~/.hermes/bots/personal ↔ /opt/data. Holds this bot's config.yaml,
 # .env (Telegram token + LLM keys), sessions/, skills/, memories/, plans/, cron/,
