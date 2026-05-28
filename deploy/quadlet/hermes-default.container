@@ -23,7 +23,14 @@ Network=roxabi.network
 
 # Hardening — defense in depth (matches lyra invariants where compatible).
 NoNewPrivileges=true
-DropCapability=all
+# DEVIATION from lyra `DropCapability=all`: upstream s6-overlay requires
+# CAP_SETUID to drop from root to the hermes user at startup. Without it,
+# `s6-overlay-suexec` fails with `unable to set supplementary group list` or
+# `/run belongs to uid 0 instead of 10000` (depends on digest). Verified
+# 2026-05-28 on digest 67011cc0…: `DropCapability=all` + `User=10000:10000`
+# produces a crashloop. We keep `NoNewPrivileges=true` as a backstop.
+# DropCapability=all
+
 # DEVIATION from lyra `ReadOnly=true`: hermes ships a writable /opt/hermes/.venv
 # by design — `tools/lazy_deps.py` installs platform-specific adapter packages
 # (discord.py, etc.) at first use, and the Dockerfile explicitly chowns .venv to
@@ -34,22 +41,29 @@ DropCapability=all
 # ReadOnly=true
 
 # UserNS=keep-id maps container UID 10000 (the baked-in `hermes` user) to host
-# UID 1000 (mickael), which owns the bot data dir. We ALSO force User=10000:10000
-# so podman starts the container directly as uid 10000 — without it, the upstream
-# entrypoint runs as root and tries to `su hermes`, which fails under our
-# DropCapability=all (no CAP_SETUID). Verified 2026-05-22 on
-# nousresearch/hermes-agent:latest digest 9d0a12c0…: removing `User=` produces
-# `error: failed switching to 'hermes': operation not permitted` and a
-# crashloop. HERMES_UID/GID env vars from the upstream docker-compose are
-# intentionally NOT set here: they only apply to the root-bootstrap path.
+# UID 1000 (mickael), which owns the bot data dir. We force User=0:0 so the
+# container starts as root — s6-overlay needs root to chown /run and related
+# s6 dirs, then it drops to hermes via `su` internally. The Quadlet generator
+# auto-injects --user 10000:10000 when UserNS=keep-id:uid=10000,gid=10000 is
+# used without an explicit User=, which breaks the s6 bootstrap on recent
+# digests (2026-05-28). Hermes still runs as uid 10000 inside the container;
+# only the brief s6-init phase is root.
 UserNS=keep-id:uid=10000,gid=10000
-User=10000:10000
+User=0:0
 
 # Bind mount: ~/.hermes/bots/default ↔ /opt/data. Holds this bot's config.yaml,
 # .env (Telegram token + LLM keys), sessions/, skills/, memories/, plans/, cron/,
 # logs/, hooks/, home/, workspace/. Fully isolated from other hermes-* bots.
 # Image is stateless — upgrade by `podman pull` (or auto-update); state survives.
 Volume=hermes-default.volume:/opt/data:z
+
+# Protect .env and config.yaml against upstream image seeding (upstream
+# stage2-hook.sh copies .env.example / cli-config.yaml.example over existing
+# files on some digests — see 2026-05-28 incident). The :ro over-mount masks
+# the files inside the bind so the init script cannot clobber them.
+# Hermes itself only reads these files; it does not need write access.
+Volume=/home/mickael/.hermes/bots/default/.env:/opt/data/.env:ro
+Volume=/home/mickael/.hermes/bots/default/config.yaml:/opt/data/config.yaml:ro
 
 # No PublishPort in pure gateway mode — Telegram polling, Discord WS, Slack
 # webhooks, LLM API calls are all outbound. Uncomment ONE of the blocks below
