@@ -33,10 +33,12 @@ ssh roxabituwer 'git clone git@github.com:Roxabi/hermes-agent.git ~/projects/rox
 ssh roxabituwer 'cd ~/projects/roxabi-hermes && make install-quadlet'
 
 # Per bot, fill ~/.hermes/bots/<name>/.env (chmod 600) before first start:
-#   CUSTOM_BASE_URL=http://host.containers.internal:18091/v1
+#   CUSTOM_BASE_URL=http://llmcli:18091/v1
 #   OPENAI_API_KEY=<your-llmcli-master-key>
 #   TELEGRAM_BOT_TOKEN=<real token>
 #   TELEGRAM_ALLOWED_USERS=<user id>
+#
+# Also create ~/.hermes/bots/<name>/config.yaml — see docs/INSTALL.md for the full template.
 
 ssh roxabituwer 'cd ~/projects/roxabi-hermes && make start'
 ```
@@ -76,3 +78,20 @@ the tip — easy to inspect, easy to drop if upstream conflicts get expensive.
 - `gh browse` and CI tooling see the deploy assets next to the code they
   deploy — no second-repo lookup.
 - Upstream sync stays a single `git rebase` away.
+
+## Operational quick-ref
+
+All commands assume `~/projects/roxabi-hermes` is cloned on M₁.
+
+| Goal | Command |
+|---|---|
+| Status of both bots | `ssh roxabituwer 'cd ~/projects/roxabi-hermes && make status'` |
+| Live logs (both bots) | `ssh roxabituwer 'cd ~/projects/roxabi-hermes && make logs'` |
+| Stop both | `ssh roxabituwer 'cd ~/projects/roxabi-hermes && make stop'` |
+| Restart both | `ssh roxabituwer 'cd ~/projects/roxabi-hermes && make restart'` |
+| Pull + reinstall + restart | `ssh roxabituwer 'cd ~/projects/roxabi-hermes && make sync'` |
+| One-off chat (no Telegram, no running container) | `ssh roxabituwer 'podman run --rm -it --network systemd-roxabi --userns=keep-id:uid=10000,gid=10000 -v ~/.hermes/bots/default:/opt/data:z -e CUSTOM_BASE_URL=http://llmcli:18091/v1 -e OPENAI_API_KEY=<your-llmcli-master-key> docker.io/nousresearch/hermes-agent:latest chat'` |
+| Attach to running container (Telegram up) | `ssh roxabituwer 'podman exec -it hermes-default hermes chat'` |
+
+One-off and exec sessions share `~/.hermes/bots/default/` state → memories /
+sessions persist across both.
