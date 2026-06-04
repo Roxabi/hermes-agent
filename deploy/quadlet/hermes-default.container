@@ -17,7 +17,10 @@ StartLimitBurst=5
 # docs/ops/container-publishing.md § Auto-Update Flow).
 # To pin a known-good version, replace `:latest` with `:vX.Y.Z` and remove the Label.
 Image=docker.io/nousresearch/hermes-agent:latest
-Label=io.containers.autoupdate=registry
+# Label=io.containers.autoupdate=registry  # DISABLED 2026-06-04: docker.io anon
+# rate-limit (toomanyrequests) poisoned the whole `podman auto-update` batch on M1,
+# exit-125 every run -> factory-* never auto-pulled. To restore: re-add this Label +
+# `podman login docker.io` (or pin Image=:vX.Y.Z and bump manually).
 ContainerName=hermes-default
 Network=roxabi.network
 
