@@ -60,13 +60,15 @@ User=0:0
 # Image is stateless — upgrade by `podman pull` (or auto-update); state survives.
 Volume=hermes-default.volume:/opt/data:z
 
-# Protect .env and config.yaml against upstream image seeding (upstream
-# stage2-hook.sh copies .env.example / cli-config.yaml.example over existing
-# files on some digests — see 2026-05-28 incident). The :ro over-mount masks
-# the files inside the bind so the init script cannot clobber them.
-# Hermes itself only reads these files; it does not need write access.
+# .env holds secrets and Hermes never writes it → :ro (also masks the upstream
+# image-seeding that clobbered files on some digests, 2026-05-28 incident).
+# config.yaml is :rw — upstream runs boot-time schema migrations
+# (docker_config_migrate.py) that MUST write it; :ro froze us at schema 0 and hung
+# the gateway (2026-06-16). The re-clobber risk is gone: upstream's seed_one() is
+# now `[ ! -f ]`-guarded (never overwrites an existing file), so :ro is no longer
+# needed here for anti-seeding.
 Volume=/home/mickael/.hermes/bots/default/.env:/opt/data/.env:ro
-Volume=/home/mickael/.hermes/bots/default/config.yaml:/opt/data/config.yaml:ro
+Volume=/home/mickael/.hermes/bots/default/config.yaml:/opt/data/config.yaml:rw
 
 # No PublishPort in pure gateway mode — Telegram polling, Discord WS, Slack
 # webhooks, LLM API calls are all outbound. Uncomment ONE of the blocks below
